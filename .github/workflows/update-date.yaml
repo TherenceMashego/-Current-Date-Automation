@@ -1,0 +1,78 @@
+# .github/workflows/update-date.yml
+name: Update Daily Date
+
+# When the workflow will run
+on:
+  # Schedule: Runs at 00:00 UTC every day (midnight)
+  schedule:
+    - cron: '0 0 * * *'  # Format: minute hour day month day-of-week
+  # Also runs when you manually trigger it from GitHub
+  workflow_dispatch:
+  # Optional: Run when you push changes (for testing)
+  push:
+    branches: [ main ]
+
+# Permissions needed for GitHub Actions to commit changes
+permissions:
+  contents: write
+
+# The job that will run
+jobs:
+  update-date:
+    # Run on Ubuntu (Linux) environment
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Step 1: Checkout (download) your repository code
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        # Fetch all history for proper commit tracking
+        fetch-depth: 0
+        # Use personal access token for pushing
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    # Step 2: Set up Node.js (needed to run our JavaScript file)
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    # Step 3: Run our JavaScript file to update the date
+    - name: Update date in HTML file
+      run: |
+        node update-date.js
+        echo "Current directory: $(pwd)"
+        echo "Files in directory: $(ls -la)"
+        echo "First 10 lines of updated HTML:"
+        head -10 index.html
+        
+    # Step 4: Configure Git
+    - name: Configure Git
+      run: |
+        git config --global user.name "GitHub Actions Bot"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        git config --global pull.rebase false
+    
+    # Step 5: Commit the changes
+    - name: Commit and push changes
+      run: |
+        # Pull any changes first
+        git pull origin main
+        
+        # Add the changed file
+        git add index.html
+        
+        # Check if there are changes
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+        else
+          # Get today's date for commit message
+          TODAY=$(date -u +"%Y-%m-%d")
+          DAY_NAME=$(date -u +"%A")
+          git commit -m "📅 Auto-update: ${DAY_NAME}, ${TODAY}"
+          
+          # Push changes
+          git push origin main
+          echo "✅ Changes pushed successfully"
+        fi
